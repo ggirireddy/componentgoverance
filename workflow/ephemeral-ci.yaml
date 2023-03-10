@@ -1,0 +1,62 @@
+name: 'EW cg Self Service Portal UI Ephemeral Pipeline'
+
+on:
+  push:
+    branches:
+      - feature/*
+
+env:
+  APP_NAME: ew-cg
+  CI_TOOLING: ${{ secrets.REGISTRY_URL }}/bts-tooling:latest
+  CHART_NAME: ${{ secrets.REGISTRY }}/bts-chart
+
+jobs: 
+  ephemeral_tag:
+    runs-on: [self-hosted,ewportal]
+    container:
+      image: btseusdevacr.azurecr.io/bts-tooling:latest
+      credentials:
+        username: ${{ secrets.AZURE_DOCKER_USER }}
+        password: ${{ secrets.AZURE_DOCKER_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Login Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Generate Image Tag
+        run: |
+          echo ${GITHUB_REF_NAME} > branch_name.txt
+          if grep ^feature branch_name.txt
+          then
+            echo ${GITHUB_REF_NAME} | tr [:upper:] [:lower:] | sed 's/feature\///g' > version.txt
+            cat version.txt
+          fi
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          path: version.txt
+  build_and_test:
+    needs: ephemeral_tag
+    runs-on: [self-hosted,ewportal]
+    container:
+      image: btseusdevacr.azurecr.io/bts-tooling:latest
+      credentials:
+        username: ${{ secrets.AZURE_DOCKER_USER }}
+        password: ${{ secrets.AZURE_DOCKER_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Login Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
+      - name: Build image
+        run: |
+          IMAGE_TAG=`cat artifact/version.txt`
+          docker build -t ${{ secrets.REGISTRY_URL }}/${APP_NAME}:${IMAGE_TAG} . 
+      ##    az acr login -n ${{ secrets.REGISTRY }}
+      #    docker push ${{ secrets.REGISTRY_URL }}/${APP_NAME}:${IMAGE_TAG}
