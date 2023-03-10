@@ -1,0 +1,29 @@
+name: Publish package to GitHub Packages
+on:
+  pull_request:
+    types: 
+      - closed
+    branches:
+      - development
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+      # Setup .npmrc file to publish to GitHub Packages
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://npm.pkg.github.com'
+          # Defaults to the user or organization that owns the workflow file incomponent governance"
+          scope: '@Brightspeed-TechM'
+      - run: npm install --force #npm install --legacy-peer-deps
+      - run: npm install --global rollup 
+      #- run: npm run clean 
+      #- run: npm run rollup
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
